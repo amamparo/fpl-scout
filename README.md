@@ -1,9 +1,8 @@
 # fpl-scout
 
-
 ## What is this?
 
-This is a Fantasy Premier League lineup optimizer which uses [RotoWire projections](https://www.rotowire.com/soccer/projections.php?type=season) and [linear programming](https://en.wikipedia.org/wiki/Linear_programming) to help me draft an optimal initial squad, set my weekly lineups, and (soon) discover beneficial transfer targets.
+This is a Fantasy Premier League squad optimizer which uses [RotoWire projections](https://www.rotowire.com/soccer/projections.php?type=season) and [linear programming](https://en.wikipedia.org/wiki/Linear_programming) to help me draft an optimal initial squad, set my weekly lineups, and (soon) discover beneficial transfer targets.
 
 
 ## Requirements
@@ -19,13 +18,11 @@ This is a Fantasy Premier League lineup optimizer which uses [RotoWire projectio
 
 
 ## Setting up
-```shell
-pipenv install
-```
+Just install the dependencies by running `pipenv install`
 
 
 ## Running locally
-All of available actions are laid out in the [Makefile](/Makefile)
+All available actions are laid out in the [Makefile](/Makefile)
 
 | Command | Action |
 | --- | --- |
