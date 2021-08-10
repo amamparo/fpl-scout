@@ -2,19 +2,16 @@
 
 ## What is this?
 
-This is a Fantasy Premier League squad optimizer which uses [RotoWire projections](https://www.rotowire.com/soccer/projections.php?type=season) and [linear programming](https://en.wikipedia.org/wiki/Linear_programming) to help me draft an optimal initial squad, set my weekly lineups, and (soon) discover beneficial transfer targets.
+This is a Fantasy Premier League squad optimizer which uses [linear programming](https://en.wikipedia.org/wiki/Linear_programming) to help me draft an optimal initial squad, set my weekly lineups, and (soon) discover beneficial transfer targets.
 
 
 ## Requirements
 - [Python 3.8.6](https://www.python.org/downloads/release/python-386/)
 - [pipenv](https://pypi.org/project/pipenv/)
 - A registered [Fantasy Premier League](https://fantasy.premierleague.com) team
-- A [RotoWire subscription](https://www.rotowire.com/subscribe/create-account.php) with access to their soccer fantasy projections package
 - The following environment variables (ideally set in a `.env` file in this project's root directory):
   - `FPL_EMAIL`
   - `FPL_PASSWORD`
-  - `ROTOWIRE_USERNAME`
-  - `ROTOWIRE_PASSWORD`
 
 
 ## Setting up
@@ -33,7 +30,7 @@ If you're using [PyCharm](https://www.jetbrains.com/pycharm/), these commands ar
 
 
 ## TODO
-- Create command to find beneficial transfers
+- Find beneficial transfers
 
 
 ## Resources / Works Cited

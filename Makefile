@@ -9,4 +9,4 @@ initial_squad:
 	pipenv run python -m src.generate_initial_squad
 
 optimal_lineup:
-	pipenv run python -m src.generate_optimal_lineup
+	pipenv run python -m src.optimize_lineup
