@@ -1,76 +1,60 @@
-import itertools
-from abc import ABC, abstractmethod
-from typing import List, Tuple
+from dataclasses import dataclass
+from statistics import mean
+from typing import List, Dict, Optional
 
-from fuzzywuzzy import process, fuzz
-from injector import inject
+from injector import inject, singleton
 
-from src.fpl.models import FplPlayer
+from src.fpl_repository import FplRepository
 from src.models import Player, Position
-from src.roto_wire.models import Projection, ProjectionType
-from src.fpl.fpl_repository import AbstractFplRepository
-from src.roto_wire.roto_wire_repository import AbstractRotoWireRepository
 
 
-class AbstractPlayerService(ABC):
-	@abstractmethod
-	def get_players(self, projection_type: ProjectionType) -> List[Player]:
-		pass
+@singleton
+class PlayerService:
+  @inject
+  def __init__(self, fpl_repository: FplRepository):
+    self.__fpl_repository = fpl_repository
 
+  @dataclass
+  class __Team:
+    id: int
+    name: str
+    next_opponent_name: str
+    upcoming_fixtures_quality: float
+    next_fixture_quality: float
 
-class PlayerService(AbstractPlayerService):
-	@inject
-	def __init__(self, roto_wire_repository: AbstractRotoWireRepository, fpl_repository: AbstractFplRepository):
-		self.__roto_wire_repository = roto_wire_repository
-		self.__fpl_repository = fpl_repository
+  def get_players(self) -> List[Player]:
+    pick_lookup: Dict[int, FplRepository.Pick] = {x.player_id: x for x in self.__fpl_repository.get_picks()}
+    players: List[PlayerService.Player] = []
+    fpl_players = self.__fpl_repository.get_players()
+    team_lookup = self.__get_team_lookup()
+    for position in self.__fpl_repository.get_positions():
+      position_players = [x for x in fpl_players if x.position_id == position.id]
+      for player in position_players:
+        availability = 1 if player.is_fully_available else \
+          float(next(x for x in player.news.split() if x.endswith('%')).replace('%', '')) / 100 if '%' in player.news \
+          else 0
+        team = team_lookup[player.team_id]
+        pick: Optional[FplRepository.Pick] = pick_lookup.get(player.id)
+        players.append(Player(id=player.id, name=player.name, team=team.name, next_opponent=team.next_opponent_name,
+                              position=Position(position.name), buy_price=player.buy_price,
+                              sell_price=pick.sell_price if pick else None, is_owned=pick is not None,
+                              next_fixture_quality=team.next_fixture_quality,
+                              upcoming_fixtures_quality=team.upcoming_fixtures_quality,
+                              selected_by_percent=player.selected_by_percent,
+                              availability=availability, quality=player.ict_index))
 
-	def get_players(self, projection_type: ProjectionType) -> List[Player]:
-		fpl_players = self.__fpl_repository.get_players()
-		projections = self.__roto_wire_repository.get_projections(projection_type)
-		players: List[Player] = []
-		for fpl_team, roto_wire_team in self.__align_fpl_roto_wire_teams(fpl_players, projections):
-			team_fpl_players = [x for x in fpl_players if x.team == fpl_team]
-			team_projections = [x for x in projections if x.team == roto_wire_team]
-			pairs: List[Tuple[FplPlayer, Projection]] = list(itertools.product(team_fpl_players, team_projections))
-			fuzzy_pairs: List[Tuple[FplPlayer, Projection, int]] = [
-				(x[0], x[1], fuzz.ratio(x[0].name, x[1].name)) for x in pairs
-			]
-			sorted_fuzzy_pairs = sorted(fuzzy_pairs, key=lambda x: x[2], reverse=True)
-			while sorted_fuzzy_pairs:
-				fpl_player, projection, score = sorted_fuzzy_pairs.pop(0)
-				players.append(self.__create_player(fpl_player, projection))
-				sorted_fuzzy_pairs = [x for x in sorted_fuzzy_pairs if x[0] != fpl_player and x[1] != projection]
+    return players
 
-		unprojected_fpl_players = [x for x in fpl_players if x.id not in [y.id for y in players]]
-		for unprojected_fpl_player in unprojected_fpl_players:
-			players.append(self.__create_player(unprojected_fpl_player, Projection(type=projection_type)))
-		return players
-
-	@staticmethod
-	def __create_player(fpl_player: FplPlayer, projection: Projection) -> Player:
-		goal_value: int = ({
-			Position.GKP: 6, Position.DEF: 6, Position.MID: 5, Position.FWD: 4
-		}).get(fpl_player.position, 0)
-		clean_sheet_value: int = ({Position.GKP: 4, Position.DEF: 4, Position.MID: 1}).get(fpl_player.position, 0)
-		goal_conceded_value: int = ({Position.GKP: -0.5, Position.DEF: -0.5}).get(fpl_player.position, 0)
-		projection_value: float = (projection.goals * goal_value) + (projection.saves * (1 / 3)) + \
-								  (projection.assists * 3) + (projection.clean_sheets * clean_sheet_value) + \
-								  (projection.goals_conceded * goal_conceded_value) + (projection.yellow_cards * -1) + \
-								  (projection.red_cards * -3) + (projection.minutes * ((4 / 3) / 90))
-		return Player(id=fpl_player.id, name=fpl_player.name, team=fpl_player.team, position=fpl_player.position,
-					  opponent=projection.opponent, bid=fpl_player.bid, ask=fpl_player.ask, projection=projection_value,
-					  value=projection_value / fpl_player.ask, is_in_squad=fpl_player.is_in_squad)
-
-	@staticmethod
-	def __align_fpl_roto_wire_teams(fpl_players: List[FplPlayer], roto_wire_projections: List[Projection]) -> \
-			List[Tuple[str, str]]:
-		fpl_teams = list(set(x.team for x in fpl_players))
-		roto_wire_teams = list(set(x.team for x in roto_wire_projections))
-		matched_fpl_teams = [x for x in fpl_teams if x in roto_wire_teams]
-		unmatched_fpl_teams = [x for x in fpl_teams if x not in roto_wire_teams]
-		unmatched_roto_wire_teams = [x for x in roto_wire_teams if x not in fpl_teams]
-		aligned_teams: List[Tuple[str, str]] = [(x, x) for x in matched_fpl_teams]
-		for unmatched_fpl_team in unmatched_fpl_teams:
-			roto_wire_team = process.extractOne(unmatched_fpl_team, unmatched_roto_wire_teams)[0]
-			aligned_teams.append((unmatched_fpl_team, roto_wire_team))
-		return aligned_teams
+  def __get_team_lookup(self) -> Dict[int, __Team]:
+    fixtures = self.__fpl_repository.get_fixtures()
+    team_lookup: Dict[int, FplRepository.Team] = {x.id: x for x in self.__fpl_repository.get_teams()}
+    teams: [List[PlayerService.__Team]] = []
+    for team in team_lookup.values():
+      upcoming_fixtures = [x for x in fixtures if team.id in x.team_difficulties][:6]
+      next_fixture = upcoming_fixtures[0]
+      next_opponent_id = next(team_id for team_id in next_fixture.team_difficulties if team_id != team.id)
+      upcoming_fixture_qualities = [1 - ((x.team_difficulties[team.id] - 1) / 4) for x in upcoming_fixtures]
+      teams.append(self.__Team(id=team.id, name=team.name, next_opponent_name=team_lookup[next_opponent_id].name,
+                               next_fixture_quality=upcoming_fixture_qualities[0],
+                               upcoming_fixtures_quality=mean(upcoming_fixture_qualities)))
+    return {x.id: x for x in teams}
