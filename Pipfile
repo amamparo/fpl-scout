@@ -17,3 +17,6 @@ prettytable = "*"
 python_version = "3.8.6"
 
 [dev-packages]
+
+[scripts]
+optimize_lineup = "python -m src.optimize_lineup"

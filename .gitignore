@@ -3,3 +3,6 @@
 .env
 cdk.out
 .cache*
+.vscode/**
+!.vscode/tasks.json
+.venv

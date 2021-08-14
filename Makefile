@@ -1,12 +1,12 @@
-install:
+environment:
 	rm -rf Pipfile.lock
-	pipenv install -d
+	PIPENV_VENV_IN_PROJECT=1 pipenv install -d
 
 test:
 	pipenv run python -m unittest src -v
 
-initial_squad:
+generate_initial_squad:
 	pipenv run python -m src.generate_initial_squad
 
-optimal_lineup:
+optimize_lineup:
 	pipenv run python -m src.optimize_lineup
