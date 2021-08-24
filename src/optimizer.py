@@ -36,6 +36,12 @@ class Optimizer:
   def set_result_size_constraint(self, size: int) -> None:
     self.__problem += pulp.lpSum(x for x in self.__player_variables) == size
 
+  def set_transfers_constraint(self, current_squad: List[Player], max_transfers: int) -> None:
+    current_squad_player_ids = [x.id for x in current_squad]
+    self.__problem += pulp.lpSum(
+      self.__player_variables[i] * (self.__players[i].id not in current_squad_player_ids) for i in self.__indexes
+    ) <= max_transfers
+
   def solve(self, optimization_constraint_getter: Callable[[Player], float]) -> List[Player]:
     self.__problem += pulp.lpSum(
       optimization_constraint_getter(self.__players[i]) * self.__player_variables[i]

@@ -70,12 +70,12 @@ class FplRepository:
   class Fixture:
     id: int
     kickoff_time: float
-    is_finished: bool
+    is_started: bool
     team_difficulties: Dict[int, int]
 
   def get_fixtures(self) -> List[Fixture]:
     return sorted([
-      self.Fixture(id=x['id'], is_finished=x['finished'],
+      self.Fixture(id=x['id'], is_started=x['started'],
                    kickoff_time=time.mktime(datetime.strptime(x['kickoff_time'], '%Y-%m-%dT%H:%M:%SZ').timetuple()),
                    team_difficulties={
                      x['team_h']: x['team_h_difficulty'],

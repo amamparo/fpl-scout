@@ -50,7 +50,7 @@ class PlayerService:
     team_lookup: Dict[int, FplRepository.Team] = {x.id: x for x in self.__fpl_repository.get_teams()}
     teams: [List[PlayerService.__Team]] = []
     for team in team_lookup.values():
-      upcoming_fixtures = [x for x in fixtures if team.id in x.team_difficulties][:6]
+      upcoming_fixtures = [x for x in fixtures if team.id in x.team_difficulties and not x.is_started][:6]
       next_fixture = upcoming_fixtures[0]
       next_opponent_id = next(team_id for team_id in next_fixture.team_difficulties if team_id != team.id)
       upcoming_fixture_qualities = [1 - ((x.team_difficulties[team.id] - 1) / 4) for x in upcoming_fixtures]
