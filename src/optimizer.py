@@ -1,5 +1,5 @@
 import sys
-from typing import List, Callable
+from typing import List, Callable, Dict
 
 import pulp
 
@@ -27,20 +27,20 @@ class Optimizer:
     self.__problem += position_sum <= maximum
     self.__problem += position_sum >= minimum
 
-  def set_team_constraints(self) -> None:
+  def set_team_constraints(self, team_limits: Dict[str, int] = None) -> None:
+    team_limits = team_limits or {}
     for team in list(set(x.team for x in self.__players)):
       self.__problem += pulp.lpSum(
         self.__player_variables[i] * (self.__players[i].team == team) for i in self.__indexes
-      ) <= 3
+      ) <= team_limits.get(team, 3)
+
+  def set_restricted_players_constraint(self, restricted_players: List[Player]) -> None:
+    self.__problem += pulp.lpSum(
+      self.__player_variables[i] * (self.__players[i] in restricted_players) for i in self.__indexes
+    ) == 0
 
   def set_result_size_constraint(self, size: int) -> None:
     self.__problem += pulp.lpSum(x for x in self.__player_variables) == size
-
-  def set_transfers_constraint(self, current_squad: List[Player], max_transfers: int) -> None:
-    current_squad_player_ids = [x.id for x in current_squad]
-    self.__problem += pulp.lpSum(
-      self.__player_variables[i] * (self.__players[i].id not in current_squad_player_ids) for i in self.__indexes
-    ) <= max_transfers
 
   def solve(self, optimization_constraint_getter: Callable[[Player], float]) -> List[Player]:
     self.__problem += pulp.lpSum(

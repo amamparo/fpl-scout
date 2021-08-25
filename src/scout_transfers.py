@@ -1,32 +1,54 @@
-from typing import List
+import itertools
+from typing import List, Tuple
 
 from injector import inject, Injector
 from prettytable import PrettyTable
+from tqdm import tqdm
 
+from src.fpl_repository import FplRepository
 from src.models import Position, Player
 from src.optimizer import Optimizer
 from src.player_service import PlayerService
 
+n_transfers: int = 2
+
 
 @inject
-def main(player_service: PlayerService) -> None:
+def main(player_service: PlayerService, fpl_repository: FplRepository) -> None:
   players = player_service.get_players()
   current_squad = [x for x in players if x.is_owned]
-  optimizer = Optimizer(players)
-  optimizer.set_budget_constraint(100)
-  optimizer.set_position_constraint(Position.GKP, minimum=2, maximum=2)
-  optimizer.set_position_constraint(Position.DEF, minimum=5, maximum=5)
-  optimizer.set_position_constraint(Position.MID, minimum=5, maximum=5)
-  optimizer.set_position_constraint(Position.FWD, minimum=3, maximum=3)
-  optimizer.set_transfers_constraint(current_squad, 1)
-  optimizer.set_team_constraints()
+  combos = []
+  bank = fpl_repository.get_bank()
+  for i in range(n_transfers):
+    combos.extend(list(itertools.combinations(current_squad, i + 1)))
+  results: List[Tuple[List[Player], List[Player], float]] = []
+  for combo in tqdm(combos):
+    outgoing_players = list(combo)
+    optimizer = Optimizer(players)
+    optimizer.set_restricted_players_constraint(current_squad)
+    freed_salary = sum(x.sell_price for x in outgoing_players)
+    optimizer.set_budget_constraint(bank + freed_salary)
+    team_limits = {}
+    for other_squad_player in [x for x in current_squad if x not in outgoing_players]:
+      team = other_squad_player.team
+      team_limits[team] = team_limits.get(team, 3) - 1
+    optimizer.set_team_constraints(team_limits)
+    for position in Position:
+      n_position_players = len([x for x in outgoing_players if x.position == position])
+      optimizer.set_position_constraint(position, minimum=n_position_players, maximum=n_position_players)
 
-  def __optimization_constraint_getter(player: Player) -> float:
-    return player.selected_by_percent
+    def __optimization_constraint_getter(player: Player) -> float:
+      return player.selected_by_percent
 
-  new_squad = optimizer.solve(__optimization_constraint_getter)
-
-  __print_squad(current_squad, new_squad)
+    incoming_players = optimizer.solve(__optimization_constraint_getter)
+    results.append((
+      outgoing_players, incoming_players,
+      sum(__optimization_constraint_getter(x) for x in incoming_players) -
+      sum(__optimization_constraint_getter(x) for x in outgoing_players)
+    ))
+  result = sorted(results, key=lambda x: x[-1], reverse=True)[0]
+  print(f'Out: {", ".join(x.name + " (" + x.position.value + ", " + str(x.selected_by_percent) + ")" for x in result[0])}')
+  print(f'In: {", ".join(x.name + " (" + x.position.value + ", " + str(x.selected_by_percent) + ")" for x in result[1])}')
 
 
 def __print_squad(current_squad: List[Player], new_squad: List[Player]) -> None:

@@ -96,6 +96,10 @@ class FplRepository:
       for x in self.__fetch(f'/api/my-team/{entry_id}/')['picks']
     ]
 
+  def get_bank(self) -> int:
+    entry_id = self.__fetch('/api/me/')['player']['entry']
+    return self.__fetch(f'/api/my-team/{entry_id}/')['transfers']['bank']
+
   def __fetch_static_data(self) -> dict:
     return self.__fetch('/api/bootstrap-static/')
 

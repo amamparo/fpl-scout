@@ -12,6 +12,7 @@ fuzzywuzzy = "*"
 python-levenshtein = "*"
 pulp = "*"
 prettytable = "*"
+tqdm = "*"
 
 [requires]
 python_version = "3.8.6"
